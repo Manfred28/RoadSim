@@ -1,0 +1,62 @@
+#class of field type objects that are used to fill up the map
+
+class field:
+    #traverse is used to determine whether moving to that field is a valid move
+    #blocked determines whether moving to a field will cause a crash
+    def __init__(self, traverse, blocked, sign):
+        self.traverse = traverse
+        self.blocked = blocked
+        self.sign = sign
+    occupiedBy = ''
+        
+    def isOccupied(self):
+        #when the map is printed, it check for each field if they are occupied by something, in which case the occupying object will have its sign printed
+        if self.occupiedBy != '':
+            return self.occupiedBy.sign
+        else:
+            return self.sign
+        
+    def occupy(self, vehicle):
+        if vehicle == '' : #used to clear a position a car was previously occupying / reset the roads qualities --only works with roads in its current form
+            self.occupiedBy = ''
+            self.traverse = True
+            self.blocked = False
+        else:
+            self.occupiedBy = vehicle
+            self.traverse = False
+            self.blocked = True
+
+
+class lamp(field):
+    counter = 0
+    
+    def setLampCounter(self, counter):
+        #this should probably done at initialization
+        self.counter = counter
+        
+    def changeCounter(self):
+        # lamp states: 1-3 = Green, 4-6  = Red. Moving to a red lamp is invalid, but does not cause crash
+        self.counter += 1
+        if self.counter > 6:
+            self.counter = 1
+        if self.counter <=3:
+            self.sign = 'G'
+            self.traverse = True
+        elif self.counter >= 4:
+            self.sign = 'R'
+            self.traverse = False
+    
+class hospital(field):
+    queue = []  #a list of routes to nearby crashes. Only one ambulance can be spawned / turn
+            
+
+class factory(field):
+    counter = 0
+
+
+    def carSpawnTimer(self):
+        if self.counter == 5:
+            self.counter = 0
+            return True #like counter in lamp, keeps track of turns. every 5 turns, a car is spawned. see cityMap.factoryCarSpawn
+        else:
+            return False
