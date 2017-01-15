@@ -1,0 +1,214 @@
+#the map is created / filled with fields. Objects on the map are moved each turn.
+from copy import deepcopy
+import vehicle
+
+cars = vehicle.cars
+ambulanceClass = vehicle.ambulanceClass
+
+class cityMap:
+    cMap = []
+    dMap = []
+    lamps = [] #a list of coordinates
+    hospitals = [] #a list of coordinates 
+    factories = [] #a list of coordinates
+    carsList = []
+
+
+#Methods that primarily operate with field objects
+   
+    def mapGen(self, road, block, rLamp, gLamp, hospital, factory):
+        # creates an empty list, and fills it with the appropriate field objects based on cmap.txt.
+        testMap = []
+        with open('cmap_default.txt', 'r') as open_file:
+            line = open_file.readline()
+            while line:
+                testMap.append(line.rstrip().split(','))
+                line = open_file.readline()
+        for y in range(len(testMap)):
+            self.cMap.append([])
+            for x in range(len(testMap[y])): 
+                if testMap[y][x] == '_':
+                    self.cMap[y].append(deepcopy(road))
+                elif testMap[y][x] == 'X':
+                    self.cMap[y].append(deepcopy(block))
+                elif testMap[y][x] == 'G':
+                    self.cMap[y].append(deepcopy(gLamp))
+                    self.lamps.append((y, x))
+                elif testMap[y][x] == 'R':
+                    self.cMap[y].append(deepcopy(rLamp))
+                    self.lamps.append((y, x))
+                elif testMap[y][x] == 'H':
+                    self.cMap[y].append(deepcopy(hospital))
+                    self.hospitals.append((y, x))
+                elif testMap[y][x] == 'F':
+                    self.cMap[y].append(deepcopy(factory))
+                    self.factories.append((y, x))
+
+    def dijkstraMap(self): #used by ambulances to get to crashes using the shortest route, hospitals are 0 distance
+        current = []
+        nextField = []
+        for y in range(len(self.cMap)+1): # dunno why the +1, should fix that with an if
+            self.dMap.append([])
+            for x in range(len(self.cMap[0])+1):
+                self.dMap[y].append(99)
+        y = 0 #for readability
+        x = 1 #for readability
+        for hospital in self.hospitals:
+            current.append(hospital)
+            self.dMap[hospital[y]][hospital[x]] = 0
+        distance = 1
+        for steps in range(60): #check distances in 60 steps range
+            for currentpos in current:
+                if self.cMap[currentpos[y]-1][currentpos[x]].blocked == False:
+                    if self.dMap[currentpos[y]-1][currentpos[x]] > distance:
+                       self.dMap[currentpos[y]-1][currentpos[x]] = distance
+                       nextField.append([currentpos[y]-1, currentpos[x]])
+                if self.cMap[currentpos[y]+1][currentpos[x]].blocked == False:
+                    if self.dMap[currentpos[y]+1][currentpos[x]] > distance:
+                       self.dMap[currentpos[y]+1][currentpos[x]] = distance
+                       nextField.append([currentpos[y]+1, currentpos[x]])
+                if self.cMap[currentpos[y]][currentpos[x]-1].blocked == False:
+                    if self.dMap[currentpos[y]][currentpos[x]-1] > distance:
+                       self.dMap[currentpos[y]][currentpos[x]-1] = distance
+                       nextField.append([currentpos[y], currentpos[x]-1])
+                if self.cMap[currentpos[y]][currentpos[x]+1].blocked == False:
+                    if self.dMap[currentpos[y]][currentpos[x]+1] > distance:
+                       self.dMap[currentpos[y]][currentpos[x]+1] = distance
+                       nextField.append([currentpos[y], currentpos[x]+1])
+            current = nextField
+            nextField = []
+            distance += 1
+
+    def dRoute(self, destination):
+        #from destination backwards, creates a list of positions that leads from the hospital to the crash based on the Dijkstra map.
+        route = []
+        current = destination   #destination is a tuple of the crash coordinates
+        distance = 99
+        nextField = []
+        route.append(destination)
+        y = 0
+        x = 1
+        while distance > 0:
+            if self.dMap[current[y]+1][current[x]] < distance:
+                distance = self.dMap[current[y]+1][current[x]]
+                nextField = []
+                nextField.append(current[y]+1)
+                nextField.append(current[x])
+            if self.dMap[current[y]-1][current[x]] < distance:
+                distance = self.dMap[current[y]-1][current[1]]
+                nextField = []
+                nextField.append(current[y]-1)
+                nextField.append(current[x])
+            if self.dMap[current[y]][current[x]+1] < distance:
+                distance = self.dMap[current[y]][current[x]+1]
+                nextField = []
+                nextField.append(current[y])
+                nextField.append(current[x]+1)
+            if self.dMap[current[y]][current[x]-1] < distance:
+                distance = self.dMap[current[y]][current[x]-1]
+                nextField = []
+                nextField.append(current[y])
+                nextField.append(current[x]-1)
+            route.append(nextField)
+            current = nextField                    
+        return route
+                
+    def putOnMap(self):
+        for car in self.carsList:
+            if self.cMap[car.posy][car.posx].traverse == True and self.cMap[car.posy][car.posx].occupiedBy == '':
+                cityMap.cMap[car.posy][car.posx].occupy(car)
+    
+    def mapPrint(self):
+        for y in range(len(self.cMap)):
+            print()
+            for x in range(len(self.cMap[0])):
+                print(self.cMap[y][x].isOccupied(), end = ',') #prints the fields sign by default, or else the sign of the object that occupies the field
+        print()
+        print()        
+            
+    def changeLamps(self):
+        for x in range(len(self.lamps)):
+            self.cMap[self.lamps[x][0]][self.lamps[x][1]].changeCounter()
+
+
+####Methods that primarily operate with moving objects on the map --- possibly should have its own file or be divided between citymap / fields / vehichles
+
+    def loadCars(self):        
+        with open('objects_default.txt', 'r') as open_file:
+            line = open_file.readline()
+            while line:
+                car = line.rstrip().split(',')
+                self.carsList.append(cars('C', int(car[0]), int(car[1]))) #creates car objects based on the default txt and stores them in a list
+                line = open_file.readline()
+
+    def carMovement(self, crash): 
+        for car in self.carsList:
+            y, x = car.move(self.cMap) #returns the coordinates of the crash if one occurs, otherwise returns 'no crash'
+            if y != 'no crash':
+                for car2 in self.carsList: #cycles through the cars and deactivates the ones that have the same coordinates as the crash
+                    if car.posx == car2.posx and car.posy == car2.posy:
+                        car2.active = False
+                self.cMap[y][x].occupy(deepcopy(crash))
+                self.closestHospital(y, x) #route to
+        for crashcar in self.carsList: #removes deactivated cars from the car list
+            if crashcar.active == False:
+                self.carsList.remove(crashcar)
+
+    def closestHospital(self, posy, posx):
+        #adds the y,x compares the distance to the crash from each hospital, shortest route and the crash positions are added to the closeset hospitals ambulance-spawn queue
+        y = 0 
+        x = 1
+        destination = (posy, posx) #position of the crash
+        route = self.dRoute(destination)
+        for hospital in self.hospitals:
+            if hospital[y] == route[-1][y] and hospital[x] == route[-1][x]:
+                self.cMap[hospital[y]][hospital[x]].queue.append(route)
+        
+    def ambulanceSpawn(self): 
+        y = 0
+        x = 1
+        for hospital in self.hospitals:
+            if self.cMap[hospital[y]][hospital[x]].queue != []:
+                ambulance = ambulanceClass('A', hospital[x], hospital[y]) #creates ambulance objects (sign, posx, posy)
+                ambulance.route = self.cMap[hospital[y]][hospital[x]].queue[0]
+                ambulance.rRoute = list(self.cMap[hospital[y]][hospital[x]].queue[0])
+                ambulance.destination = ambulance.route[0]
+                self.carsList.append(ambulance)
+                self.cMap[hospital[y]][hospital[x]].occupiedBy == ambulance
+                del self.cMap[hospital[y]][hospital[x]].queue[0]
+                
+    def factoryCarSpawn(self):
+        y = 0
+        x = 1
+        for factory in self.factories:
+            self.cMap[factory[y]][factory[x]].counter += 1
+            if self.cMap[factory[y]][factory[x]].carSpawnTimer() == True:
+                #check each neighbouring field if one of them is eligible for a car to be spawned there.
+                #If one of them is, creates a new car in that position, field.occupy(car) is used to occupy it
+                #the new car is added to the car list in cmap.
+                if self.cMap[factory[y]][factory[x]+1].traverse == True: #right
+                    newCar = cars('C', factory[x]+1, factory[y])
+                    self.cMap[factory[y]][factory[x]+1].occupy(newCar)
+                    self.carsList.append(newCar)
+                elif self.cMap[factory[y]][factory[x]-1].traverse == True: #left
+                    newCar = cars('C', factory[x]-1, factory[y])
+                    self.cMap[factory[y]][factory[x]-1].occupy(newCar)
+                    self.carsList.append(newCar)
+                elif self.cMap[factory[y]+1][factory[x]].traverse == True: #down
+                    newCar = cars('C', factory[x], factory[y]+1)
+                    self.cMap[factory[y]+1][factory[x]].occupy(newCar)
+                    self.carsList.append(newCar)
+                elif self.cMap[factory[y]-1][factory[x]].traverse == True: #up
+                    newCar = cars('C', factory[x], factory[y]-1)
+                    self.cMap[factory[y]-1][factory[x]].occupy(newCar)
+                    self.carsList.append(newCar)
+                #nothing happens if there is neighbouring free field
+                
+       
+    def itsMoving(self, turns, crash):    # method for turns
+       for turn in range(turns):
+            self.changeLamps()
+            self.carMovement(crash)
+            self.ambulanceSpawn()
+            self.factoryCarSpawn()
+            self.mapPrint()
