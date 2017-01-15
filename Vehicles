@@ -1,0 +1,86 @@
+from random import randint
+from random import choice
+from enum import Enum
+from collections import namedtuple
+
+class Directions(Enum): #probably shouldn't be global
+    RIGHT = 1
+    LEFT = 2
+    UP = 3
+    DOWN = 4
+
+class cars:
+    def __init__(self, sign, posx, posy):
+        self.sign = sign
+        self.posx = posx
+        self.posy = posy
+    active = True
+    
+    def move(self, cMap):
+        if self.active == True:
+            Coordinates = namedtuple('Coordinates', ['posy',  'posx'])
+            movelist = [] #a list of valid moves
+            prevpos = Coordinates(self.posy, self.posx) #position prior to moving
+            if randint(1, 5) == 1: # % chance that any move becomems valid
+                for x in range(1, 5):
+                    movelist.append(x)
+            else:
+               if cMap[self.posy][self.posx+1].traverse == True: #right
+                   movelist.append(1)
+               if cMap[self.posy][self.posx-1].traverse == True: #left
+                   movelist.append(2)
+               if cMap[self.posy+1][self.posx].traverse == True: #down
+                   movelist.append(3)    
+               if cMap[self.posy-1][self.posx].traverse == True: #up
+                   movelist.append(4)
+            if movelist != []:
+                step = choice(movelist) # if there is any valid move, changes the position at random
+                cMap[self.posy][self.posx].occupy('') #makes the current field unoccupied before moving
+                if step == Directions.RIGHT.value:
+                    self.posx += 1
+                elif step == Directions.LEFT.value:
+                    self.posx -= 1
+                elif step == Directions.UP.value:
+                    self.posy += 1
+                elif step == Directions.DOWN.value:
+                    self.posy -= 1
+            else: # in case movelist is empty, nothing happens
+                return 'no crash', 'no crash'
+            if cMap[self.posy][self.posx].blocked == True: # causes a crash if the move was invalid, moves the object there if it wasn't.
+                if cMap[self.posy][self.posx].occupiedBy != '': #if the car moved to a blocked field that is occupied by a car
+                    return self.posy, self.posx
+                else: #otherwise if the field has blocked == True is a building. prevpos is returned so that the crash doesnt appear on the building field
+                    return prevpos.posy, prevpos.posx
+            else:
+                cMap[self.posy][self.posx].occupy(self)        #the field the car moved to becomes occupied by that car
+        return 'no crash', 'no crash'
+
+class ambulanceClass(cars):
+    route = [] #route[-1] is the hospital, or the crash site when returning. 
+    rRoute = [] #return route
+    destination = [] #y, x, by default the coordinates of the crash. Stores the coordinates of the hospital when returning
+    active = True
+    returning = False
+    
+    def move(self, cMap):
+        if self.active == True:
+            cMap[self.posx][self.posy].occupiedBy = '' #clears occupation of current position
+            self.posx = self.route[-2][0]
+            self.posy = self.route[-2][1]
+            cMap[self.posx][self.posy].occupiedBy = self
+            del self.route[-2]
+            if self.returning == False:
+                if self.posx == self.destination[0] and self.posy == self.destination[1]:
+                    #if the car is on its way to the crash and reaches the crash, route is reversed
+                    self.destination = self.route[-1]
+                    self.rRoute.reverse()
+                    self.route = self.rRoute
+                    self.returning = True
+            else:
+                if self.posx == self.destination[0] and self.posy == self.destination[1]:
+                    #When the ambulance gets back to the hospital, its deactivated and ceases to occupy any fields
+                    cMap[self.posx][self.posy].occupiedBy = ''
+                    self.active = False
+        return 'no crash', 'no crash' #ambulances cant cause crashes
+        #ambulances, unlike cars, do not use .occupy, instead they simply change occupiedBy.
+        #This is so that they do not modify the qualities of the field they occupy, and can cause no crashes
