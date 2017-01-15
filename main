@@ -1,0 +1,25 @@
+#roadsim main
+
+import cityMap
+import fields
+
+cityMap = cityMap.cityMap()
+
+road = fields.field(True, False, '_')
+block = fields.field(False, True, 'X')
+crash = fields.field(False, True, 'B')
+
+rLamp = fields.lamp(False, False, 'R')
+rLamp.setLampCounter(4)
+gLamp = fields.lamp(True, False, 'G')
+gLamp.setLampCounter(1)
+
+hospitalBuilding = fields.hospital(False, True, 'H')
+factory = fields.factory(False, True, 'F')
+
+cityMap.mapGen(road, block, rLamp, gLamp, hospitalBuilding, factory)
+cityMap.dijkstraMap()
+cityMap.loadCars()
+cityMap.putOnMap()
+cityMap.mapPrint()
+cityMap.itsMoving(30, crash)
